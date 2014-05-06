@@ -30,7 +30,7 @@ LON_NAME2       	<- "i"
 LON_NAME3         <- "rlon"
 LON_NAME4         <- "y"
 
-LOGFILE				<- "logfile.csv"
+INVFILE				<- paste0( OUTPUT_DIR, "inventory.csv" )
 TIME_NAME       	<- "time"
 
 # -----------------------------------------------------------------------------
@@ -63,14 +63,14 @@ printlog <- function( msg, ..., ts=TRUE, cr=TRUE ) {
 }
 
 # -----------------------------------------------------------------------------
-# We keep a log of processed files
-logfile <- function( fname="", model="", scenario="", ensemble="", units="", status="OK", newfile=FALSE ) {
-	if( newfile | !file.exists( LOGFILE ) ) {
-		cat( "Date,File,Model,Years,Scenario,Ensemble,Units,Status\n", file=LOGFILE )
+# We keep an inventory of processed files
+invfile <- function( fname="", model="", scenario="", ensemble="", units="", status="OK", newfile=FALSE ) {
+	if( newfile | !file.exists( INVFILE ) ) {
+		cat( "Date,File,Model,Years,Scenario,Ensemble,Units,Status\n", file=INVFILE )
 	}
 	if( fname!= "" | status != "") {
 		cat( date(), fname, model, paste( range( YEAR_RANGE1 ), collapse="-" ), scenario, 
-		ensemble, units, status, "\n", file=LOGFILE, sep=",", append=T )
+		ensemble, units, status, "\n", file=INVFILE, sep=",", append=T )
 	}
 }
 
@@ -212,7 +212,7 @@ process_file <- function( fn, skip_existing=FALSE ) {
 	model <- filedata[ 3 ]
 	scenario <- filedata[ 4 ]
 	ensemble <- filedata[ 5 ]
-	outfn <- paste( fn, ".csv", sep="" )
+	outfn <- paste0( OUTPUT_DIR, basename( fn ), ".csv" )
 
 	if (file.exists( outfn ) & skip_existing ) {
 		printlog ("Skipping file", fn )
@@ -228,7 +228,7 @@ process_file <- function( fn, skip_existing=FALSE ) {
 
 	if( nchar( begintime ) != nchar( endtime ) | ( nchar( begintime ) != 4 & nchar( begintime ) != 6 ) ) {
 		printlog( "*** Uh oh! Something's wrong--date not 4 or 6 digits. Skipping ***" )
-		logfile( fn, status="Date not 4 or 6 digits" )
+		invfile( fn, status="Date not 4 or 6 digits" )
 		warning( paste( "Couldn't parse filename", i ) )
 		next
 	}
@@ -270,13 +270,12 @@ process_file <- function( fn, skip_existing=FALSE ) {
 		results$units <- NULL		# these will go to log file instead
 		results$variable <- NULL		# these will go to log file instead
 
-		outfn <- paste( fn, ".csv", sep="" )
 		printlog( "Writing output file", outfn, "..." )
-		write.csv( results, file=paste0( OUTPUT_DIR, outfn ), row.names=F )
-		logfile( fn, model, scenario, ensemble, units )
+		write.csv( results, file=outfn, row.names=F )
+		invfile( fn, model, scenario, ensemble, units )
 	} else {
 		printlog( "NULL results! Not writing any output" )
-		logfile( fn, status="NULL results back from process_data" )
+		invfile( fn, status="NULL results back from process_data" )
 	} # if
 }
 
@@ -284,7 +283,7 @@ process_file <- function( fn, skip_existing=FALSE ) {
 # Process a whole directory of files
 process_directory <- function( dir, pattern="*.nc$" ) {
 
-	logfile( newfile=T )	# erase the skip log and start a new one
+	invfile( newfile=T )	# erase the skip log and start a new one
 
 	printlog( "------------------------" )
 	printlog( "Welcome to process_directory" )
