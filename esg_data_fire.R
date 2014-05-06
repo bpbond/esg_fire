@@ -12,8 +12,8 @@ LOG_DIR			<- "logs/"
 # To use:
 #	1. Call process_directory or process_file as appropriate
 
-YEAR_RANGE1			<- 2006:2008
-YEAR_RANGE2			<- 2096:2098	# these should be same length
+YEAR_RANGE1			<- 1996:1999
+YEAR_RANGE2			<- 2066:2069	# these should be same length
 
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
@@ -189,9 +189,10 @@ process_data <- function( fn, variable, beginyear, beginmonth, endyear, endmonth
 	printlog( "Reading tempfile back into results..." )
 	results <- read.csv( tf )
 	printdims( results )
+	printlog( "Size =", format( object.size( results ), units = "Mb" ) )
 	printlog( "Removing NA values and rounding..." )
 	results <- subset( results, !is.na( value ) )
-	results$value <- round( results$value, 2 )
+	results$value <- round( results$value, 6 )
 	results$X1 <- NULL
 	results$X2 <- NULL
 	results$units <- att.get.ncdf (ncid, variable,  "units" )$value
@@ -251,13 +252,13 @@ process_file <- function( fn, skip_existing=FALSE ) {
 
 	results1 <- NULL  
 	results2 <- NULL  
-	if ( length( intersect( YEAR_RANGE1, beginyear:endyear ) ) ) {
+	if( all( YEAR_RANGE1 %in% beginyear:endyear ) ) {
 		results1 <- process_data( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, YEAR_RANGE1 )
 	} else {
 		printlog( "Skipping YEAR_RANGE1 - dates not included in this file" )
 	}
 	
-	if ( length( intersect( YEAR_RANGE2, beginyear:endyear ) ) ) {
+	if( all( YEAR_RANGE2 %in% beginyear:endyear ) ) {
 		results2 <- process_data( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, YEAR_RANGE2 )
 	} else {
 		printlog( "Skipping YEAR_RANGE2 - dates not included in this file" )	
