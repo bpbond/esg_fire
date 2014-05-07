@@ -8,6 +8,7 @@ SCRIPTNAME		<- "esg_data_fire.R"
 INPUT_DIR		<- "sampledata/"
 OUTPUT_DIR		<- "outputs/"
 LOG_DIR			<- "logs/"
+SEPARATOR		<- "-------------------"
 
 # To use:
 #	1. Call process_directory or process_file as appropriate
@@ -204,8 +205,16 @@ process_data <- function( fn, variable, beginyear, beginmonth, endyear, endmonth
 }
 
 # -----------------------------------------------------------------------------
+# Parse a CMIP5 filename
+parse_filename <- function( fn ) {
+}
+
+# -----------------------------------------------------------------------------
 # Process a single file, parsing information from its name and calling process_data
-process_file <- function( fn, skip_existing=FALSE ) {
+# allow_historical is a flag indiating whether we should process this file if it's historical
+# normally no: we skip historical files
+# but when recursing, can't find years in a scenario, allow and return data to caller (us)
+process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 	filedata <- strsplit( basename( fn ), "_" )[[ 1 ]]
 	printlog( "------------------------" )
 	printlog( "File:", fn )
@@ -214,11 +223,17 @@ process_file <- function( fn, skip_existing=FALSE ) {
 	scenario <- filedata[ 4 ]
 	ensemble <- filedata[ 5 ]
 	outfn <- paste0( OUTPUT_DIR, basename( fn ), ".csv" )
-
+	
+	if( scenario=="historical" & !allow_historical ) {
+		printlog( "Skipping this historical file" )
+		invfile( fn, status="Historical file" )
+		return( NULL )
+	}
+	
 	if (file.exists( outfn ) & skip_existing ) {
 		printlog ("Skipping file", fn )
-		skiplog( fn, "Output filename already exists" )
-		return()
+		invfile( fn, "Output filename already exists" )
+		return( NULL )
 	}
 
 	printlog( variable, model, scenario, ensemble )
@@ -231,7 +246,7 @@ process_file <- function( fn, skip_existing=FALSE ) {
 		printlog( "*** Uh oh! Something's wrong--date not 4 or 6 digits. Skipping ***" )
 		invfile( fn, status="Date not 4 or 6 digits" )
 		warning( paste( "Couldn't parse filename", i ) )
-		next
+		return( NULL )
 	}
 
 	beginyear <- as.numeric( substr( begintime, 1, 4 ) )
@@ -256,15 +271,44 @@ process_file <- function( fn, skip_existing=FALSE ) {
 		results1 <- process_data( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, YEAR_RANGE1 )
 	} else {
 		printlog( "Skipping YEAR_RANGE1 - dates not included in this file" )
+		
+		# ...but these years might be in a 'historical' file
+		# if so, recurse to get those data
+		otherfn <- paste( variable, filedata[ 2 ], model, "historical", ensemble, "*.*", sep="_" )
+		filelist <- list.files( dirname( fn ), otherfn )
+		if( length( filelist )==1 & !allow_historical ) {
+			otherfn <- filelist[ 1 ]
+			printlog( "Possible alternate file exists:", otherfn )
+#			readline()
+			printlog( "Shifting to historical file" )
+			results1 <- process_file( paste0( dirname( fn ), "/", otherfn ), skip_existing, allow_historical=T )
+			printlog( "We're back" )
+			print( summary( results1 ) )
+		}
 	}
 	
 	if( all( YEAR_RANGE2 %in% beginyear:endyear ) ) {
 		results2 <- process_data( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, YEAR_RANGE2 )
 	} else {
-		printlog( "Skipping YEAR_RANGE2 - dates not included in this file" )	
+		printlog( "Skipping YEAR_RANGE2 - dates not included in this file" )
 	}
 	
 	results <- rbind( results1, results2 )
+
+	if( allow_historical ) {		# bail - we don't want to write anything out
+		printlog( "Returning data to caller without writing..." )
+		return( results )
+	}
+	
+	# compute differences between results1 and results2, if both available
+	if( !is.null( results1 ) & !is.null( results2 ) ) {
+		results3 <- results1
+		stopifnot( nrow( results1 )==nrow( results2 ) )
+		# we're assuming that the two data frames are structured identically
+		results3$value <- results2$value - results1$value
+		results3$year <- results3$year - min( results3$year )
+		results <- rbind( results, results3 )
+	}
 	
 	if( !is.null( results ) ) {
 		units <- results[ 1, "units" ]
@@ -278,6 +322,7 @@ process_file <- function( fn, skip_existing=FALSE ) {
 		printlog( "NULL results! Not writing any output" )
 		invfile( fn, status="NULL results back from process_data" )
 	} # if
+	return( NULL )
 }
 
 # -----------------------------------------------------------------------------
@@ -286,8 +331,8 @@ process_directory <- function( dir, pattern="*.nc$" ) {
 
 	invfile( newfile=T )	# erase the skip log and start a new one
 
-	printlog( "------------------------" )
-	printlog( "Welcome to process_directory" )
+	printlog( SEPARATOR )
+	printlog( "Welcome to process_directory_step1" )
 	files <- list.files( dir, pattern=pattern )
 	printlog( length( files ), "files to process" )
 
@@ -295,7 +340,6 @@ process_directory <- function( dir, pattern="*.nc$" ) {
 		process_file( paste( dir, i, sep="/" ) )
 	}
 }
-
 
 # =============================================================================
 # Main
