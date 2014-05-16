@@ -7,6 +7,7 @@
 SCRIPTNAME		<- "esg_data_fire.R"
 INPUT_DIR		<- "sampledata/"
 OUTPUT_DIR		<- "outputs/"
+HIST_DIR        <- "../historical/"  # relative to location of file being processed
 LOG_DIR			<- "logs/"
 SEPARATOR		<- "-------------------"
 
@@ -275,15 +276,20 @@ process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 		# ...but these years might be in a 'historical' file
 		# if so, recurse to get those data
 		otherfn <- paste( variable, filedata[ 2 ], model, "historical", ensemble, "*.*", sep="_" )
-		filelist <- list.files( dirname( fn ), otherfn )
+        otherdir <- paste0( dirname( fn ), "/", HIST_DIR)
+        printlog ("Looking in folder", otherdir)
+        
+		filelist <- list.files( otherdir, otherfn )
 		if( length( filelist )==1 & !allow_historical ) {
 			otherfn <- filelist[ 1 ]
 			printlog( "Possible alternate file exists:", otherfn )
 #			readline()
 			printlog( "Shifting to historical file" )
-			results1 <- process_file( paste0( dirname( fn ), "/", otherfn ), skip_existing, allow_historical=T )
+			results1 <- process_file( paste0( otherdir, "/", otherfn ), skip_existing, allow_historical=T )
 			printlog( "We're back" )
 			print( summary( results1 ) )
+		} else {
+			printlog ("no alternative file found")
 		}
 	}
 	
