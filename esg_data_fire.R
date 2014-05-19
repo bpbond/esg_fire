@@ -89,7 +89,7 @@ read_dimension_names <- function( ncid, variable ) {
 		}
 	} # for
 	stop( "*** Variable", variable, "not found!!" )
-}
+} # read_dimension_names
 
 # -----------------------------------------------------------------------------
 # Figure out whether there are levels in the file, and if so, how many we need to use
@@ -101,7 +101,7 @@ determine_levels <- function( ncid, dnames, depth ) {
 	}
 	printlog( "Levels to read for", LEVEL_DEPTH, "=", levels_to_read )
 	return( levels_to_read )
-}
+} # determine_levels
 
 # -----------------------------------------------------------------------------
 # Read a single time point, averaging over levels if necessary
@@ -124,7 +124,7 @@ read_timepoint <- function( ncid, variable, levels_to_avg, startdata, countdata,
 	}
 
 	return( d )
-}
+} # read_timepoint
 
 # -----------------------------------------------------------------------------
 # The workhorse: read a file's data, fill data frame, write out
@@ -205,18 +205,16 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
    
     results_agg$units <- att.get.ncdf (ncid, variable,  "units" )$value
     results_agg$variable <- variable
-    #printlog("we are here")
-    #average the months over the year ranges
-    
     
     close.ncdf( ncid )
     
     return( results_agg ) 
-}
+} # process_data
+
 # -----------------------------------------------------------------------------
 # Parse a CMIP5 filename
 parse_filename <- function( fn ) {
-}
+} # parse_filename
 
 # -----------------------------------------------------------------------------
 # Process a single file, parsing information from its name and calling process_data
@@ -337,7 +335,7 @@ process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 		invfile( fn, status="NULL results back from process_data" )
 	} # if
 	return( NULL )
-}
+} # process_file
 
 # -----------------------------------------------------------------------------
 # Process a whole directory of files
@@ -353,7 +351,7 @@ process_directory <- function( dir, pattern="*.nc$" ) {
 	for( i in files ) {
 		process_file( paste( dir, i, sep="/" ) )
 	}
-}
+} # process_directory
 
 # =============================================================================
 # Main
