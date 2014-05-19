@@ -14,8 +14,8 @@ SEPARATOR		<- "-------------------"
 # To use:
 #	1. Call process_directory or process_file as appropriate
 
-YEAR_RANGE1			<- 1996:1999
-YEAR_RANGE2			<- 2066:2069	# these should be same length
+YEAR_RANGE1			<- 1998:1999
+YEAR_RANGE2			<- 2068:2069	# these should be same length
 
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
@@ -184,7 +184,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
             
             d_m$month <- month
             
-           write.table( d_m, file=tf, row.names=F, col.names=( yearindex==1 ), sep=",", append = !first_time )
+           write.table( d_m, file=tf, row.names=F, col.names=first_time, sep=",", append = !first_time )
             first_time <- F
         } # for month
     } # for year
@@ -200,9 +200,18 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
     
     # Calculate a single monthly mean across all years for each grid point
     printlog( "Aggregating years...." )
-    results_agg <- aggregate( value~month+lat+lon, data=results, mean )	# aggregate faster than ddply
-    #results_agg <- ddply( results, .( lat, lon, month ), summarise, value=mean( value ), nyears=length( lat ), .progress="text" )
-   
+    print( system.time( 
+    	{ 	# base R: aggregate
+    		#results_agg <- aggregate( value~month+lat+lon, data=results, mean )	 # aggregate faster than ddply 
+    		
+    		# plyr
+    		#results_agg <- ddply( results, .( lat, lon, month ), summarise, value=mean( value ), nyears=length( lat ), .progress="text" )
+    		
+    		# dplyr
+    		results_grouped <- group_by( results, month, lat, lon)
+    		results_agg <- summarise( results_grouped, value=mean( value ) )
+    	}
+	   ) )
     results_agg$units <- att.get.ncdf (ncid, variable,  "units" )$value
     results_agg$variable <- variable
     
@@ -371,7 +380,7 @@ printlog( "Welcome to", SCRIPTNAME )
 
 printlog( "We are processing years", range( YEAR_RANGE1 ), "and", range( YEAR_RANGE2 ) )
 
-loadlibs( c( "ncdf", "reshape", "ggplot2", "plyr" ) )
+loadlibs( c( "ncdf", "reshape2", "ggplot2", "plyr", "dplyr" ) )
 theme_set( theme_bw() )
 
 process_directory( INPUT_DIR )
