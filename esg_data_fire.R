@@ -5,7 +5,7 @@
 
 # Important variable definitions, esp. data source & destination
 SCRIPTNAME		<- "esg_data_fire.R"
-INPUT_DIR		<- "sampledata/Corinne"
+INPUT_DIR		<- "sampledata/"
 OUTPUT_DIR		<- "outputs/"
 HIST_DIR        <- "../historical/"  # relative to location of file being processed
 LOG_DIR			<- "logs/"
@@ -128,7 +128,7 @@ read_timepoint <- function( ncid, variable, levels_to_avg, startdata, countdata,
 
 # -----------------------------------------------------------------------------
 # The workhorse: read a file's data, fill data frame, write out
-process_data <- function( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, year_range ) {
+process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range ) {
 
 	stopifnot( datafreq==DATAFREQ_MONTHLY )
 
@@ -169,42 +169,53 @@ process_data <- function( fn, variable, beginyear, beginmonth, endyear, endmonth
 	countdata[ timeindex ] <- 1 # always reading only 1 time slice at a time
 	countdata[ levindex ] <- 1  # always reading only 1 level at a time
 
-	for( yearindex in 1:length( year_range ) ) {
-		printlog( "-- processing year index", yearindex )
+	 first_time <- T
+    for( yearindex in 1:length( year_range ) ) {
+        printlog( "-- processing year index", yearindex, year_range[ yearindex ] )
+        
+        for( month in 1:12 ) {		# assume we're not processing any fractional years
+            printlog( "--   reading month", month )
+            startdata[ timeindex ] <- ( year_range[ yearindex ]-beginyear ) * MONTHS_PER_YEAR + month
+            d <- read_timepoint( ncid, variable, levels_to_avg, startdata, countdata, levindex )
+            d_m <- melt( d )
+            d_m$year <- year_range[ yearindex ]
+            d_m$lat <- latlon$Var2
+            d_m$lon <- latlon$Var1
+            
+            d_m$month <- month
+            
+           write.table( d_m, file=tf, row.names=F, col.names=( yearindex==1 ), sep=",", append = !first_time )
+            first_time <- F
+        } # for month
+    } # for year
 
-		for( month in 1:12 ) {		# assume we're not processing any fractional years
-			printlog( "--   reading month", month )
-			startdata[ timeindex ] <- ( MONTHS_PER_YEAR-beginmonth+1 ) + ( year_range[ yearindex ]-beginyear-1 ) * MONTHS_PER_YEAR + month
-
-			d <- read_timepoint( ncid, variable, levels_to_avg, startdata, countdata, levindex )
-			d_m <- melt( d )
-			d_m$year <- year_range[ yearindex ]
-			d_m$lat <- latlon$Var2
-			d_m$lon <- latlon$Var1
-
-			d_m$month <- month
-
-			write.table( d_m, file=tf, row.names=F, col.names=( yearindex==1 ), sep=",", append =! ( yearindex==1 ) )
-		} # for month
-	} # for year
-
-	printlog( "Reading tempfile back into results..." )
-	results <- read.csv( tf )
-	printdims( results )
-	printlog( "Size =", format( object.size( results ), units = "Mb" ) )
-	printlog( "Removing NA values and rounding..." )
-	results <- subset( results, !is.na( value ) )
-	results$value <- round( results$value, 6 )
-	results$X1 <- NULL
-	results$X2 <- NULL
-	results$units <- att.get.ncdf (ncid, variable,  "units" )$value
-	results$variable <- variable
-
-	close.ncdf( ncid )
-
-	return( results ) 
+ 
+    printlog( "Reading tempfile back into results..." )
+    results <- read.csv( tf )
+    printdims( results )
+    printlog( "Size =", format( object.size( results ), units = "Mb" ) )
+    printlog( "Removing NA values and rounding..." )
+    results <- subset( results, !is.na( value ) )
+   # results$value <- round( results$value, 6 )
+    
+    # this returns me a data frame with 1-12 months and 1 value according to those months.  But, I loose all information
+    # on lat/lon/grids.  And then we get caught up on the subtraction bc of my notation. 
+    printlog( "Aggregating months...." )
+    results_agg<-aggregate(value~month+lat+lon, data=results, mean )
+    #results_agg <- ddply( results, .( lat, lon, month ), summarise, value=mean( value ), nyears=length( lat ), .progress="text" )
+   
+    results_agg$X1 <- NULL
+    results_agg$X2 <- NULL
+    results_agg$units <- att.get.ncdf (ncid, variable,  "units" )$value
+    results_agg$variable <- variable
+    printlog("we are here")
+    #average the months over the year ranges
+    
+    
+    close.ncdf( ncid )
+    
+    return( results_agg ) 
 }
-
 # -----------------------------------------------------------------------------
 # Parse a CMIP5 filename
 parse_filename <- function( fn ) {
