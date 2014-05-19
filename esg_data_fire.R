@@ -5,7 +5,7 @@
 
 # Important variable definitions, esp. data source & destination
 SCRIPTNAME		<- "esg_data_fire.R"
-INPUT_DIR		<- "sampledata/"
+INPUT_DIR		<- "sampledata/Corinne"
 OUTPUT_DIR		<- "outputs/"
 HIST_DIR        <- "../historical/"  # relative to location of file being processed
 LOG_DIR			<- "logs/"
