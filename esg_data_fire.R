@@ -5,7 +5,7 @@
 
 # Important variable definitions, esp. data source & destination
 SCRIPTNAME		<- "esg_data_fire.R"
-INPUT_DIR		<- "sampledata/"
+INPUT_DIR		<- "G:/Yannick/hurs/hurs/rcp45"
 OUTPUT_DIR		<- "outputs/"
 HIST_DIR        <- "../historical/"  # relative to location of file being processed
 LOG_DIR			<- "logs/"
@@ -305,6 +305,7 @@ process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 			print( summary( results1 ) )
 		} else {
 			printlog ("no alternative file found")
+        return( NULL )
 		}
 	}
 	
