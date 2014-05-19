@@ -194,7 +194,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
     results <- read.csv( tf )
     printdims( results )
     printlog( "Size =", format( object.size( results ), units = "Mb" ) )
-    printlog( "Removing NA values and rounding..." )
+   # printlog( "Removing NA values and rounding..." )
     results <- subset( results, !is.na( value ) )
    # results$value <- round( results$value, 6 )
     
@@ -209,7 +209,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
     		
     		# dplyr
     		results_grouped <- group_by( results, month, lat, lon)
-    		results_agg <- summarise( results_grouped, value=mean( value ) )
+    		results_agg <- dplyr::summarise( results_grouped, value=mean( value ), year=mean( year ) )
     	}
 	   ) )
     results_agg$units <- att.get.ncdf (ncid, variable,  "units" )$value
@@ -328,7 +328,7 @@ process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 		stopifnot( nrow( results1 )==nrow( results2 ) )
 		# we're assuming that the two data frames are structured identically
 		results3$value <- results2$value - results1$value
-		results3$year <- results3$year - min( results3$year )
+		results3$year <- length( YEAR_RANGE2 )
 		results <- rbind( results, results3 )
 	}
 	
