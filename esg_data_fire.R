@@ -169,7 +169,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	countdata[ timeindex ] <- 1 # always reading only 1 time slice at a time
 	countdata[ levindex ] <- 1  # always reading only 1 level at a time
 
-	 first_time <- T
+	first_time <- T
     for( yearindex in 1:length( year_range ) ) {
         printlog( "-- processing year index", yearindex, year_range[ yearindex ] )
         
@@ -198,17 +198,14 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
     results <- subset( results, !is.na( value ) )
    # results$value <- round( results$value, 6 )
     
-    # this returns me a data frame with 1-12 months and 1 value according to those months.  But, I loose all information
-    # on lat/lon/grids.  And then we get caught up on the subtraction bc of my notation. 
-    printlog( "Aggregating months...." )
-    results_agg<-aggregate(value~month+lat+lon, data=results, mean )
+    # Calculate a single monthly mean across all years for each grid point
+    printlog( "Aggregating years...." )
+    results_agg <- aggregate( value~month+lat+lon, data=results, mean )	# aggregate faster than ddply
     #results_agg <- ddply( results, .( lat, lon, month ), summarise, value=mean( value ), nyears=length( lat ), .progress="text" )
    
-    results_agg$X1 <- NULL
-    results_agg$X2 <- NULL
     results_agg$units <- att.get.ncdf (ncid, variable,  "units" )$value
     results_agg$variable <- variable
-    printlog("we are here")
+    #printlog("we are here")
     #average the months over the year ranges
     
     
@@ -280,7 +277,7 @@ process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 	results1 <- NULL  
 	results2 <- NULL  
 	if( all( YEAR_RANGE1 %in% beginyear:endyear ) ) {
-		results1 <- process_data( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, YEAR_RANGE1 )
+		results1 <- process_data( fn, variable, beginyear, endyear, datafreq, YEAR_RANGE1 )
 	} else {
 		printlog( "Skipping YEAR_RANGE1 - dates not included in this file" )
 		
@@ -305,7 +302,7 @@ process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 	}
 	
 	if( all( YEAR_RANGE2 %in% beginyear:endyear ) ) {
-		results2 <- process_data( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, YEAR_RANGE2 )
+		results2 <- process_data( fn, variable, beginyear, endyear, datafreq, YEAR_RANGE2 )
 	} else {
 		printlog( "Skipping YEAR_RANGE2 - dates not included in this file" )
 	}
