@@ -5,8 +5,8 @@
 
 # Important variable definitions, esp. data source & destination
 SCRIPTNAME		<- "esg_data_fire.R"
-INPUT_DIR		<- "G:/Yannick/prc/rcp60"
-OUTPUT_DIR		<- "G:/Yannick/prc/rcp60/"
+INPUT_DIR		<- "G:/Yannick/hurs/hurs/rcp45"
+OUTPUT_DIR		<- "outputs/"
 HIST_DIR        <- "../historical/"  # relative to location of file being processed
 LOG_DIR			<- "logs/"
 SEPARATOR		<- "-------------------"
@@ -14,8 +14,8 @@ SEPARATOR		<- "-------------------"
 # To use:
 #	1. Call process_directory or process_file as appropriate
 
-YEAR_RANGE1			<- 1986:2005
-YEAR_RANGE2			<- 2081:2100	# these should be same length
+YEAR_RANGE1			<- 1998:1999
+YEAR_RANGE2			<- 2068:2069	# these should be same length
 
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
@@ -230,7 +230,7 @@ parse_filename <- function( fn ) {
 # allow_historical is a flag indiating whether we should process this file if it's historical
 # normally no: we skip historical files
 # but when recursing, can't find years in a scenario, allow and return data to caller (us)
-process_file <- function( fn, skip_existing=TRUE, allow_historical=F ) {
+process_file <- function( fn, skip_existing=FALSE, allow_historical=F ) {
 	filedata <- strsplit( basename( fn ), "_" )[[ 1 ]]
 	printlog( "------------------------" )
 	printlog( "File:", fn )
