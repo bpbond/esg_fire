@@ -14,10 +14,14 @@ SEPARATOR		<- "-------------------"
 # To use:
 #   1. Set input and output directories, above
 #   2. Set year ranges, below
-#	3. Call process_variable
+#   3. Set scenario, below
+#	4. Call process_variable
 
 YEAR_RANGE1			<- 1998:1999
 YEAR_RANGE2			<- 2068:2069	# these should be same length
+SCENARIO            <- "rcp85"      # plus any historical files will also be processed
+VARIABLES           <- c( "tas" )
+MODELS              <- c( "CMCC-CESM" )
 
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
@@ -233,6 +237,12 @@ process_file <- function( fn, tf ) {
 	scenario <- filedata[ 4 ]
 	ensemble <- filedata[ 5 ]
 
+    if( tolower( scenario ) != tolower( SCENARIO ) ) {
+        if( tolower( scenario ) != "historical" ) {
+            printlog( "File is not", SCENARIO, "or historical--skipping" )
+            return( NULL )
+        }
+    }
 	printlog( variable, model, scenario, ensemble )
 	filename <- strsplit( filedata[ 6 ], ".", fixed=T )[[ 1 ]][ 1 ]
 	timedata <- strsplit( filename, "-" )[[ 1 ]]
@@ -263,7 +273,10 @@ process_file <- function( fn, tf ) {
 	printlog( beginyear, beginmonth, endyear, endmonth )
 
 	results <- process_data( fn, variable, beginyear, endyear, datafreq )
-	
+	results$model <- model
+#    results$scenario <- scenario
+    results$ensemble <- ensemble
+    
     if( !is.null( results ) ) {
         printlog( "Writing data to tempfile..." )
         first <- !file.exists( tf )
@@ -273,20 +286,22 @@ process_file <- function( fn, tf ) {
 
 # -----------------------------------------------------------------------------
 # Process a particular variable, in a (recursive) directory of files
-process_variable <- function( variable, dir=INPUT_DIR, pattern="*.nc$" ) {
+process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" ) {
 
 	invfile( newfile=T )	# erase the skip log and start a new one
 
 	printlog( SEPARATOR )
-	printlog( "Welcome to process_directory_step1" )
+	printlog( "Welcome to process_directory: doing", model, variable )
+    
+    # filter file list to just the variable and model we're processing
 	files <- list.files( dir, pattern=pattern )
-    files <- files[ grepl( paste0( "^", variable ), files ) ]
+	files <- files[ grepl( paste0( "^", variable ), files ) ]
+	files <- files[ grepl( paste0( model ), files ) ]
+	
 	printlog( length( files ), "files to process" )
     tf <- tempfile()
     printlog( "Tempfile:", tf )
 
-	outfn <- paste0( OUTPUT_DIR, variable, ".csv" )
-	    
 	for( i in files ) {
 		process_file( paste( dir, i, sep="/" ), tf )
 	}
@@ -297,7 +312,7 @@ process_variable <- function( variable, dir=INPUT_DIR, pattern="*.nc$" ) {
         return()
     }
     
-	printlog( "Reading tempfile for", variable, "back in..." )
+	printlog( "Reading tempfile for", model, variable, "back in..." )
     results <- read.csv( tf )
     printdims( results )
     results$range <- NA
@@ -317,6 +332,7 @@ process_variable <- function( variable, dir=INPUT_DIR, pattern="*.nc$" ) {
         return()
 	}
 	
+
     # Calculate a single monthly mean across all years for each grid point
 	printlog( "Aggregating years...." )
 	print( system.time( 
@@ -327,12 +343,11 @@ process_variable <- function( variable, dir=INPUT_DIR, pattern="*.nc$" ) {
     #results_agg <- ddply( results, .( lat, lon, month ), summarise, value=mean( value ), nyears=length( lat ), .progress="text" )
     
     # dplyr
-    results_grouped <- group_by( results, range, month, lat, lon, units )
+    results_grouped <- group_by( results, model, ensemble, range, month, lat, lon, units )
     results_agg <- dplyr::summarise( results_grouped, value=mean( value ), year=mean( year ) )
 }
 	) )
 
-    results_agg$variable <- variable
     printdims( results_agg )
 
     # compute differences between the two year ranges
@@ -345,8 +360,17 @@ process_variable <- function( variable, dir=INPUT_DIR, pattern="*.nc$" ) {
     final_results <- rbind( results_agg, results3 )
     final_results$range <- NULL
 
+    outfn <- paste0( OUTPUT_DIR, variable, "_", SCENARIO, ".csv" )
     printlog( "Writing", outfn )
     write.csv( final_results, file=outfn, row.names=F )
+
+    for( m in unique( final_results$model ) ) {
+        outfnm <- paste0( OUTPUT_DIR, variable, "_", SCENARIO, "_", m, ".csv" )
+        d <- subset( final_results, model==m )
+        d$model <- NULL
+        printlog( "Writing", outfnm )
+        write.csv( d, file=outfnm, row.names=F )
+    }
 #    invfile( fn, model, scenario, ensemble, units )
 
 } # process_directory
@@ -372,7 +396,11 @@ printlog( "We are processing years", range( YEAR_RANGE1 ), "and", range( YEAR_RA
 loadlibs( c( "ncdf", "reshape2", "ggplot2", "plyr", "dplyr" ) )
 theme_set( theme_bw() )
 
-process_variable( "tas" )
+for( m in MODELS ) {
+    for( v in VARIABLES ) {
+        process_directory( m, v )
+    }
+}
 
 printlog( "All done." )
 sink()
