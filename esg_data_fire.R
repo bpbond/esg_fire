@@ -58,7 +58,8 @@ loadlibs <- function( liblist ) {
 # Print dimensions of data frame
 printdims <- function( d, dname=deparse( substitute( d ) ) ) {
 	stopifnot( is.data.frame( d ) )
-	printlog( dname, "rows =", nrow( d ), "cols =", ncol( d ) )
+	printlog( dname, "rows =", nrow( d ), "cols =", ncol( d ), 
+		"size =", format( object.size( results ), units = "Mb" ) )
 } # printdims
 
 # -----------------------------------------------------------------------------
@@ -143,7 +144,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	ncid <- open.ncdf( fn )
 	print( ncid )
 
-	printlog( "Getting lat/lon data" )  
+#	printlog( "Getting lat/lon data" )  
 	lat <- get.var.ncdf( ncid, LAT_NAME )
 	lon <- get.var.ncdf( ncid, LON_NAME )
 	# lat and lon can be returned in two different ways
@@ -154,7 +155,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	}  
 	
 	tf <- tempfile()
-	printlog( "Using tempfile", tf )
+#	printlog( "Using tempfile", tf )
 
 	dnames <- read_dimension_names( ncid, variable )
 	printlog( "Dimensions names for", variable, "=", dnames )
@@ -165,8 +166,8 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	lonindex <- which( dnames==LON_NAME | dnames==LON_NAME2| dnames==LON_NAME3 | dnames==LON_NAME4)
 	levindex <- which( dnames==LEVEL_NAME )
 	timeindex <- which( dnames==TIME_NAME )
-	printlog( "latindex lonindex levindex timeindex" )
-	printlog( latindex, lonindex, levindex, timeindex )
+#	printlog( "latindex lonindex levindex timeindex" )
+#	printlog( latindex, lonindex, levindex, timeindex )
 	startdata <- rep( 1, length( dnames ) )
 	countdata <- rep( -1, length( dnames ) )
 	countdata[ timeindex ] <- 1 # always reading only 1 time slice at a time
@@ -203,7 +204,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	    printlog( "Reading tempfile back into results..." )
 	    results <- read.csv( tf )
 	    printdims( results )
-	    printlog( "Size =", format( object.size( results ), units = "Mb" ) )
+#	    printlog( "Size =", format( object.size( results ), units = "Mb" ) )
 	    # printlog( "Removing NA values and rounding..." )
 	    results <- subset( results, !is.na( value ) )
 	    # results$value <- round( results$value, 6 )
@@ -268,11 +269,10 @@ process_file <- function( fn, tf ) {
 		datafreq <- DATAFREQ_ANNUAL
 	}
 
-	printlog( "This appears to be", datafreq, "data" )
-	printlog( beginyear, beginmonth, endyear, endmonth )
+#	printlog( "This appears to be", datafreq, "data" )
+#	printlog( beginyear, beginmonth, endyear, endmonth )
 
 	results <- process_data( fn, variable, beginyear, endyear, datafreq )
-
     
     if( !is.null( results ) ) {
         results$model <- model
@@ -285,7 +285,7 @@ process_file <- function( fn, tf ) {
 } # process_file
 
 # -----------------------------------------------------------------------------
-# Process a particular variable, in a (recursive) directory of files
+# Process a particular variable and model in a (recursive) directory of files
 process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" ) {
 
 	invfile( newfile=T )	# erase the skip log and start a new one
