@@ -5,9 +5,8 @@
 
 # Important variable definitions, esp. data source & destination
 SCRIPTNAME		<- "esg_data_fire.R"
-INPUT_DIR		<- "./sampledata/"
-OUTPUT_DIR		<- "./outputs/"
-HIST_DIR        <- "./"  # relative to location of file being processed
+INPUT_DIR		<- "G:/Yannick"
+OUTPUT_DIR		<- "G:/Yannick/output/"
 LOG_DIR			<- "logs/"
 SEPARATOR		<- "-------------------"
 
@@ -17,11 +16,11 @@ SEPARATOR		<- "-------------------"
 #   3. Set scenario, below
 #	4. Call process_variable
 
-YEAR_RANGE1			<- 1998:1999
-YEAR_RANGE2			<- 2068:2069	# these should be same length
+YEAR_RANGE1			<- 2001:2005
+YEAR_RANGE2			<- 2096:2100	# these should be same length
 SCENARIO            <- "rcp85"      # plus any historical files will also be processed
-VARIABLES           <- c( "tas" )
-MODELS              <- c( "CMCC-CESM" )
+VARIABLES           <- c( "tas")
+MODELS              <- c( "CMCC-CESM", "CanESM2")
 
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
@@ -179,13 +178,13 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
         year <- year_range[ yearindex ]
         inrange <- year %in% YEAR_RANGE1 | year %in% YEAR_RANGE2
         if( !inrange ) {
-            printlog( "-- skipping year", year )
+           # printlog( "-- skipping year", year )
             next
         }
         printlog( "-- processing year index", yearindex, year )
         
         for( month in 1:12 ) {		# assume we're not processing any fractional years
-            printlog( "--   reading month", month )
+            #printlog( "--   reading month", month )
             startdata[ timeindex ] <- ( year_range[ yearindex ]-beginyear ) * MONTHS_PER_YEAR + month
             d <- read_timepoint( ncid, variable, levels_to_avg, startdata, countdata, levindex )
             d_m <- melt( d )
@@ -273,11 +272,12 @@ process_file <- function( fn, tf ) {
 	printlog( beginyear, beginmonth, endyear, endmonth )
 
 	results <- process_data( fn, variable, beginyear, endyear, datafreq )
-	results$model <- model
-#    results$scenario <- scenario
-    results$ensemble <- ensemble
+
     
     if( !is.null( results ) ) {
+        results$model <- model
+        #    results$scenario <- scenario
+        results$ensemble <- ensemble
         printlog( "Writing data to tempfile..." )
         first <- !file.exists( tf )
         write.table( results, file=tf, sep=",", row.names=F, col.names=first, append=!first )        
@@ -294,11 +294,17 @@ process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" )
 	printlog( "Welcome to process_directory: doing", model, variable )
     
     # filter file list to just the variable and model we're processing
-	files <- list.files( dir, pattern=pattern )
-	files <- files[ grepl( paste0( "^", variable ), files ) ]
+	files <- list.files( dir, pattern=pattern, recursive=TRUE )
+	files <- files[ grepl( paste0( "^", variable ), basename(files) ) ]
 	files <- files[ grepl( paste0( model ), files ) ]
 	
 	printlog( length( files ), "files to process" )
+    
+    if( any( duplicated( basename( files ) ) ) ) {
+     printlog( "WARNING...Duplicate files found:", files[ duplicated( basename( files ) ) ] )
+     stop( 'Fix this!' )
+    }
+    
     tf <- tempfile()
     printlog( "Tempfile:", tf )
 
@@ -318,7 +324,7 @@ process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" )
     results$range <- NA
     results[ results$year %in% YEAR_RANGE1, "range" ] <- 1
 	results[ results$year %in% YEAR_RANGE2, "range" ] <- 2
-	print(summary(results))
+
 
     printlog( "Checking data..." )
     results1 <- subset( results, year %in% YEAR_RANGE1 )
@@ -329,6 +335,7 @@ process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" )
 	if( nrow( results1 ) != nrow( results2 ) ) {
 	    printlog( "*** Uh oh! Something's wrong--Unequal data sets for year ranges ***" )
 	    invfile( variable, status="Unequal data sets for year ranges" )
+        printlog("Data are in", tf)
         return()
 	}
 	
@@ -359,10 +366,6 @@ process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" )
 #    results3$range <- 3
     final_results <- rbind( results_agg, results3 )
     final_results$range <- NULL
-
-    outfn <- paste0( OUTPUT_DIR, variable, "_", SCENARIO, ".csv" )
-    printlog( "Writing", outfn )
-    write.csv( final_results, file=outfn, row.names=F )
 
     for( m in unique( final_results$model ) ) {
         outfnm <- paste0( OUTPUT_DIR, variable, "_", SCENARIO, "_", m, ".csv" )
