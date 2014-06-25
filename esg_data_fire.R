@@ -19,8 +19,8 @@ SEPARATOR		<- "-------------------"
 YEAR_RANGE1			<- 2001:2005
 YEAR_RANGE2			<- 2096:2100	# these should be same length
 SCENARIO            <- "rcp85"      # plus any historical files will also be processed
-VARIABLES           <- c( "tas")
-MODELS              <- c( "CMCC-CESM", "CanESM2")
+VARIABLES           <- c( "tas", "sfcWind")
+MODELS              <- c( "CMCC-CESM", "GFDL-ESM2G", "GFDL-ESM2M")
 
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
@@ -59,7 +59,7 @@ loadlibs <- function( liblist ) {
 printdims <- function( d, dname=deparse( substitute( d ) ) ) {
 	stopifnot( is.data.frame( d ) )
 	printlog( dname, "rows =", nrow( d ), "cols =", ncol( d ), 
-		"size =", format( object.size( results ), units = "Mb" ) )
+		"size =", format( object.size( d ), units = "Mb" ) )
 } # printdims
 
 # -----------------------------------------------------------------------------
