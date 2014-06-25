@@ -5,14 +5,16 @@
 
 # Important variable definitions, esp. data source & destination
 SCRIPTNAME		<- "esg_data_fire.R"
-INPUT_DIR		<- "G:/Yannick/pr/rcp45"
-OUTPUT_DIR		<- "G:/Yannick/pr/rcp45/"
-HIST_DIR        <- "../historical/"  # relative to location of file being processed
+INPUT_DIR		<- "./sampledata/"
+OUTPUT_DIR		<- "./outputs/"
+HIST_DIR        <- "./"  # relative to location of file being processed
 LOG_DIR			<- "logs/"
 SEPARATOR		<- "-------------------"
 
 # To use:
-#	1. Call process_directory or process_file as appropriate
+#   1. Set input and output directories, above
+#   2. Set year ranges, below
+#	3. Call process_variable
 
 YEAR_RANGE1			<- 1998:1999
 YEAR_RANGE2			<- 2068:2069	# these should be same length
@@ -147,8 +149,6 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	} else {
 		latlon <- expand.grid( lon, lat )    
 	}  
-
-	printlog( "Year range looking for is", year_range )
 	
 	tf <- tempfile()
 	printlog( "Using tempfile", tf )
@@ -170,8 +170,15 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	countdata[ levindex ] <- 1  # always reading only 1 level at a time
 
 	first_time <- T
+    year_range <- beginyear:endyear
     for( yearindex in 1:length( year_range ) ) {
-        printlog( "-- processing year index", yearindex, year_range[ yearindex ] )
+        year <- year_range[ yearindex ]
+        inrange <- year %in% YEAR_RANGE1 | year %in% YEAR_RANGE2
+        if( !inrange ) {
+            printlog( "-- skipping year", year )
+            next
+        }
+        printlog( "-- processing year index", yearindex, year )
         
         for( month in 1:12 ) {		# assume we're not processing any fractional years
             printlog( "--   reading month", month )
@@ -189,35 +196,22 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
         } # for month
     } # for year
 
- 
-    printlog( "Reading tempfile back into results..." )
-    results <- read.csv( tf )
-    printdims( results )
-    printlog( "Size =", format( object.size( results ), units = "Mb" ) )
-   # printlog( "Removing NA values and rounding..." )
-    results <- subset( results, !is.na( value ) )
-   # results$value <- round( results$value, 6 )
+	if( file.exists( tf ) ) {
+	    printlog( "Reading tempfile back into results..." )
+	    results <- read.csv( tf )
+	    printdims( results )
+	    printlog( "Size =", format( object.size( results ), units = "Mb" ) )
+	    # printlog( "Removing NA values and rounding..." )
+	    results <- subset( results, !is.na( value ) )
+	    # results$value <- round( results$value, 6 )
+	    results$units <- att.get.ncdf (ncid, variable,  "units" )$value
+	} else {
+	    results <- NULL
+	}
     
-    # Calculate a single monthly mean across all years for each grid point
-    printlog( "Aggregating years...." )
-    print( system.time( 
-    	{ 	# base R: aggregate
-    		#results_agg <- aggregate( value~month+lat+lon, data=results, mean )	 # aggregate faster than ddply 
-    		
-    		# plyr
-    		#results_agg <- ddply( results, .( lat, lon, month ), summarise, value=mean( value ), nyears=length( lat ), .progress="text" )
-    		
-    		# dplyr
-    		results_grouped <- group_by( results, month, lat, lon)
-    		results_agg <- dplyr::summarise( results_grouped, value=mean( value ), year=mean( year ) )
-    	}
-	   ) )
-    results_agg$units <- att.get.ncdf (ncid, variable,  "units" )$value
-    results_agg$variable <- variable
+	close.ncdf( ncid )
     
-    close.ncdf( ncid )
-    
-    return( results_agg ) 
+    return( results ) 
 } # process_data
 
 # -----------------------------------------------------------------------------
@@ -230,7 +224,7 @@ parse_filename <- function( fn ) {
 # allow_historical is a flag indiating whether we should process this file if it's historical
 # normally no: we skip historical files
 # but when recursing, can't find years in a scenario, allow and return data to caller (us)
-process_file <- function( fn, skip_existing=TRUE, allow_historical=F ) {
+process_file <- function( fn, tf ) {
 	filedata <- strsplit( basename( fn ), "_" )[[ 1 ]]
 	printlog( "------------------------" )
 	printlog( "File:", fn )
@@ -238,19 +232,6 @@ process_file <- function( fn, skip_existing=TRUE, allow_historical=F ) {
 	model <- filedata[ 3 ]
 	scenario <- filedata[ 4 ]
 	ensemble <- filedata[ 5 ]
-	outfn <- paste0( OUTPUT_DIR, basename( fn ), ".csv" )
-	
-	if( scenario=="historical" & !allow_historical ) {
-		printlog( "Skipping this historical file" )
-		invfile( fn, status="Historical file" )
-		return( NULL )
-	}
-	
-	if (file.exists( outfn ) & skip_existing ) {
-		printlog ("Skipping file", fn )
-		invfile( fn, "Output filename already exists" )
-		return( NULL )
-	}
 
 	printlog( variable, model, scenario, ensemble )
 	filename <- strsplit( filedata[ 6 ], ".", fixed=T )[[ 1 ]][ 1 ]
@@ -281,86 +262,93 @@ process_file <- function( fn, skip_existing=TRUE, allow_historical=F ) {
 	printlog( "This appears to be", datafreq, "data" )
 	printlog( beginyear, beginmonth, endyear, endmonth )
 
-	results1 <- NULL  
-	results2 <- NULL  
-	if( all( YEAR_RANGE1 %in% beginyear:endyear ) ) {
-		results1 <- process_data( fn, variable, beginyear, endyear, datafreq, YEAR_RANGE1 )
-	} else {
-		printlog( "Skipping YEAR_RANGE1 - dates not included in this file" )
-		
-		# ...but these years might be in a 'historical' file
-		# if so, recurse to get those data
-		otherfn <- paste( variable, filedata[ 2 ], model, "historical", ensemble, "*.*", sep="_" )
-        otherdir <- paste0( dirname( fn ), "/", HIST_DIR)
-        printlog ("Looking in folder", otherdir)
-        
-		filelist <- list.files( otherdir, otherfn )
-		if( length( filelist )==1 & !allow_historical ) {
-			otherfn <- filelist[ 1 ]
-			printlog( "Possible alternate file exists:", otherfn )
-#			readline()
-			printlog( "Shifting to historical file" )
-			results1 <- process_file( paste0( otherdir, "/", otherfn ), skip_existing, allow_historical=T )
-			printlog( "We're back" )
-			print( summary( results1 ) )
-		} else {
-			printlog ("no alternative file found")
-        return( NULL )
-		}
-	}
+	results <- process_data( fn, variable, beginyear, endyear, datafreq )
 	
-	if( all( YEAR_RANGE2 %in% beginyear:endyear ) ) {
-		results2 <- process_data( fn, variable, beginyear, endyear, datafreq, YEAR_RANGE2 )
-	} else {
-		printlog( "Skipping YEAR_RANGE2 - dates not included in this file" )
-	}
-	
-	results <- rbind( results1, results2 )
-
-	if( allow_historical ) {		# bail - we don't want to write anything out
-		printlog( "Returning data to caller without writing..." )
-		return( results )
-	}
-	
-	# compute differences between results1 and results2, if both available
-	if( !is.null( results1 ) & !is.null( results2 ) ) {
-		results3 <- results1
-		stopifnot( nrow( results1 )==nrow( results2 ) )
-		# we're assuming that the two data frames are structured identically
-		results3$value <- results2$value - results1$value
-		results3$year <- length( YEAR_RANGE2 )
-		results <- rbind( results, results3 )
-	}
-	
-	if( !is.null( results ) ) {
-		units <- results[ 1, "units" ]
-		results$units <- NULL		# these will go to log file instead
-		results$variable <- NULL		# these will go to log file instead
-
-		printlog( "Writing output file", outfn, "..." )
-		write.csv( results, file=outfn, row.names=F )
-		invfile( fn, model, scenario, ensemble, units )
-	} else {
-		printlog( "NULL results! Not writing any output" )
-		invfile( fn, status="NULL results back from process_data" )
-	} # if
-	return( NULL )
+    if( !is.null( results ) ) {
+        printlog( "Writing data to tempfile..." )
+        first <- !file.exists( tf )
+        write.table( results, file=tf, sep=",", row.names=F, col.names=first, append=!first )        
+    }
 } # process_file
 
 # -----------------------------------------------------------------------------
-# Process a whole directory of files
-process_directory <- function( dir, pattern="*.nc$" ) {
+# Process a particular variable, in a (recursive) directory of files
+process_variable <- function( variable, dir=INPUT_DIR, pattern="*.nc$" ) {
 
 	invfile( newfile=T )	# erase the skip log and start a new one
 
 	printlog( SEPARATOR )
 	printlog( "Welcome to process_directory_step1" )
 	files <- list.files( dir, pattern=pattern )
+    files <- files[ grepl( paste0( "^", variable ), files ) ]
 	printlog( length( files ), "files to process" )
+    tf <- tempfile()
+    printlog( "Tempfile:", tf )
 
+	outfn <- paste0( OUTPUT_DIR, variable, ".csv" )
+	    
 	for( i in files ) {
-		process_file( paste( dir, i, sep="/" ) )
+		process_file( paste( dir, i, sep="/" ), tf )
 	}
+    
+	printlog( SEPARATOR )
+	if( !file.exists( tf ) ) {
+        printlog( "No data written to tempfile! Exiting" )
+        return()
+    }
+    
+	printlog( "Reading tempfile for", variable, "back in..." )
+    results <- read.csv( tf )
+    printdims( results )
+    results$range <- NA
+    results[ results$year %in% YEAR_RANGE1, "range" ] <- 1
+	results[ results$year %in% YEAR_RANGE2, "range" ] <- 2
+	print(summary(results))
+
+    printlog( "Checking data..." )
+    results1 <- subset( results, year %in% YEAR_RANGE1 )
+    results2 <- subset( results, year %in% YEAR_RANGE2 )
+	printdims( results1 )
+	printdims( results2 )
+    
+	if( nrow( results1 ) != nrow( results2 ) ) {
+	    printlog( "*** Uh oh! Something's wrong--Unequal data sets for year ranges ***" )
+	    invfile( variable, status="Unequal data sets for year ranges" )
+        return()
+	}
+	
+    # Calculate a single monthly mean across all years for each grid point
+	printlog( "Aggregating years...." )
+	print( system.time( 
+{ 	# base R: aggregate
+    #results_agg <- aggregate( value~month+lat+lon, data=results, mean )	 # aggregate faster than ddply 
+    
+    # plyr
+    #results_agg <- ddply( results, .( lat, lon, month ), summarise, value=mean( value ), nyears=length( lat ), .progress="text" )
+    
+    # dplyr
+    results_grouped <- group_by( results, range, month, lat, lon, units )
+    results_agg <- dplyr::summarise( results_grouped, value=mean( value ), year=mean( year ) )
+}
+	) )
+
+    results_agg$variable <- variable
+    printdims( results_agg )
+
+    # compute differences between the two year ranges
+    results1 <- subset( results_agg, range==1 )
+    results2 <- subset( results_agg, range==2 )
+    results3 <- results1
+    results3$value <- results2$value - results1$value
+    results3$year <- length( YEAR_RANGE2 )
+#    results3$range <- 3
+    final_results <- rbind( results_agg, results3 )
+    final_results$range <- NULL
+
+    printlog( "Writing", outfn )
+    write.csv( final_results, file=outfn, row.names=F )
+#    invfile( fn, model, scenario, ensemble, units )
+
 } # process_directory
 
 # =============================================================================
@@ -384,7 +372,7 @@ printlog( "We are processing years", range( YEAR_RANGE1 ), "and", range( YEAR_RA
 loadlibs( c( "ncdf", "reshape2", "ggplot2", "plyr", "dplyr" ) )
 theme_set( theme_bw() )
 
-process_directory( INPUT_DIR )
+process_variable( "tas" )
 
 printlog( "All done." )
 sink()
