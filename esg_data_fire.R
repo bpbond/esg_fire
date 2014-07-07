@@ -16,12 +16,12 @@ SEPARATOR		<- "-------------------"
 #   3. Set scenario, below
 #	4. Call process_variable
 
-YEAR_RANGE1			<- 2001:2005
-YEAR_RANGE2			<- 2096:2100	# these should be same length
+YEAR_RANGE1			<- 1991:2010
+YEAR_RANGE2			<- 2081:2100	# these should be same length
 SCENARIO            <- "rcp85"      # plus any historical files will also be processed
-VARIABLES           <- c( "tas", "sfcWind")
-MODELS              <- c( "CMCC-CESM", "GFDL-ESM2G", "GFDL-ESM2M")
-
+VARIABLES           <- c( "tas")
+MODELS              <- c("ACCESS1-3","CanESM2", "GFDL-ESM2G", "GFDL-ESM2M",  "IPSL-CM5A-MR","GISS-E2-H","CESM1-CAM5", "CMCC-CESM", "GISS-E2-H",  "HadGEM2-CC",   "MIROC-ESM") 
+# "ACCESS1-3","CanESM2", "GFDL-ESM2G", "GFDL-ESM2M", "IPSL-CM5A-MR","MIROC-ESM-CHEM","GISS-E2-H",
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
 MONTHS_PER_YEAR   	<- 12
@@ -155,7 +155,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 	}  
 	
 	tf <- tempfile()
-#	printlog( "Using tempfile", tf )
+	printlog( "Using tempfile", tf )
 
 	dnames <- read_dimension_names( ncid, variable )
 	printlog( "Dimensions names for", variable, "=", dnames )
@@ -202,7 +202,7 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
 
 	if( file.exists( tf ) ) {
 	    printlog( "Reading tempfile back into results..." )
-	    results <- read.csv( tf )
+	    results <- as.data.frame ( fread( tf ) )
 	    printdims( results )
 #	    printlog( "Size =", format( object.size( results ), units = "Mb" ) )
 	    # printlog( "Removing NA values and rounding..." )
@@ -295,8 +295,8 @@ process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" )
     
     # filter file list to just the variable and model we're processing
 	files <- list.files( dir, pattern=pattern, recursive=TRUE )
-	files <- files[ grepl( paste0( "^", variable ), basename(files) ) ]
-	files <- files[ grepl( paste0( model ), files ) ]
+	files <- files[ grepl( paste0( "^", variable, "_" ), basename(files) ) ]
+	files <- files[ grepl( paste0( "_", model, "_" ), files ) ]
 	
 	printlog( length( files ), "files to process" )
     
@@ -319,7 +319,7 @@ process_directory <- function( model, variable, dir=INPUT_DIR, pattern="*.nc$" )
     }
     
 	printlog( "Reading tempfile for", model, variable, "back in..." )
-    results <- read.csv( tf )
+    results <- as.data.frame ( fread( tf ) )
     printdims( results )
     results$range <- NA
     results[ results$year %in% YEAR_RANGE1, "range" ] <- 1
@@ -396,7 +396,7 @@ printlog( "Welcome to", SCRIPTNAME )
 
 printlog( "We are processing years", range( YEAR_RANGE1 ), "and", range( YEAR_RANGE2 ) )
 
-loadlibs( c( "ncdf", "reshape2", "ggplot2", "plyr", "dplyr" ) )
+loadlibs( c( "ncdf", "reshape2", "ggplot2", "plyr", "dplyr" , "data.table") )
 theme_set( theme_bw() )
 
 for( m in MODELS ) {
