@@ -17,14 +17,14 @@ SEPARATOR		<- "-------------------"
 #	4. Call process_variable
 
 YEAR_RANGE1			<- 1991:2010
-YEAR_RANGE2			<- 2081:2100	# these should be same length
+YEAR_RANGE2			<- 2081:2099	# these should be same length
 SCENARIO            <- "rcp85"      # plus any historical files will also be processed
 VARIABLES           <- c( "tas")
-MODELS              <- c("ACCESS1-3","CanESM2", "GFDL-ESM2G", "GFDL-ESM2M",  "IPSL-CM5A-MR","GISS-E2-H","CESM1-CAM5", "CMCC-CESM", "GISS-E2-H",  "HadGEM2-CC",   "MIROC-ESM") 
-# "ACCESS1-3","CanESM2", "GFDL-ESM2G", "GFDL-ESM2M", "IPSL-CM5A-MR","MIROC-ESM-CHEM","GISS-E2-H",
+MODELS              <- c("HadGEM2-ES") 
+#c("ACCESS1-3", "CanESM2", "CESM1-CAM5", "GISS-E2-H", "GFDL-ESM2M", "IPSL-CM5A-MR",  "MIROC-ESM", "HadGEM2-CC"  ) 
 DATAFREQ_ANNUAL     <- "annual"
 DATAFREQ_MONTHLY    <- "monthly"
-MONTHS_PER_YEAR   	<- 12
+MONTHS_PER_YEAR   	<- 12 
 
 LAT_NAME      		<- "lat"
 LAT_NAME2       	<- "j"
