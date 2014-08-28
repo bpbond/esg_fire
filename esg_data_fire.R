@@ -1,3 +1,4 @@
+#TEST
 # Script to process ESG files into CSV annual summary format
 # B.B.-L. and C.H. for Yannick fire project
 # March 2014
@@ -135,7 +136,7 @@ read_timepoint <- function( ncid, variable, levels_to_avg, startdata, countdata,
 # -----------------------------------------------------------------------------
 # The workhorse: read a file's data, fill data frame, write out
 process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range ) {
-
+process_data <- function( fn, variable, beginyear, beginmonth, endyear, endmonth, datafreq, year_range ) {
 	stopifnot( datafreq==DATAFREQ_MONTHLY )
 
 	results <- data.frame()
@@ -185,8 +186,22 @@ process_data <- function( fn, variable, beginyear, endyear, datafreq, year_range
         printlog( "-- processing year index", yearindex, year )
         
         for( month in 1:12 ) {		# assume we're not processing any fractional years
+		# BUT WE ARE!
+		# NEED SOMETHING HERE TO HELP THOSE FILES THAT START AT MONTH 11. I WAS THINKING
+		# SOMETHING SIMILAR TO ESG_DATA LINE 226-249 AND THEN GO AHEAD AND TAKE THE RANGES..
+		
+		year <- beginyear
+		month <- beginmonth
+		endyearmonth <- endyear + endmonth/12
+		timespot <- 1
+				
             #printlog( "--   reading month", month )
-            startdata[ timeindex ] <- ( year_range[ yearindex ]-beginyear ) * MONTHS_PER_YEAR + month
+			while( ( year + month/12 ) <= endyearmonth ) {
+			# SOMETHING WITH TIMESPOT HERE....BUT AGAIN CONFUSED ABOUT THE RANGE. 
+			# MAYBE WE NEED TO PUT EVERYTHING IN A SINGLE tf AND THEN TAKE THE RANGES?
+			#startdata[ timeindex ] <- timespot
+			# but this may have to go at the top..bah!
+			startdata[ timeindex ] <- ( year_range[ yearindex ]-beginyear ) * MONTHS_PER_YEAR + month
             d <- read_timepoint( ncid, variable, levels_to_avg, startdata, countdata, levindex )
             d_m <- melt( d )
             d_m$year <- year_range[ yearindex ]
